@@ -146,7 +146,3 @@ Este projeto foi desenvolvido para praticar:
 ## 👨‍💻 Autor
 
 Feito como projeto de estudo em Rust 🦀
-
----
-
-Se quiser evoluir esse projeto (tipo salvar tarefas em JSON ou transformar num CLI profissional com argumentos), dá pra levar isso pra outro nível 🚀
