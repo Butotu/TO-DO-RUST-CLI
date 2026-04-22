@@ -6,6 +6,23 @@ fn listar_tarefas(lista: &mut Vec<Tarefa>) {
         println!("{}, {} {}", i.titulo, i.descricao, i.feito)
     }
 }
+fn retirar_tarefa(lista: &mut Vec<Tarefa>) {
+    let mut lista2 = lista;
+
+    let mut contador = 0;
+
+    for (i) in lista2.iter() {
+        contador = contador + 1;
+        println!("{}, {} {}", i.titulo, i.descricao, i.feito)
+    }
+    println!("Digite o titulo que você deseja retirar:");
+    let mut resposta1 = String::new();
+    io::stdin().read_line(&mut resposta1).unwrap();
+
+    if let Some(i) = lista2.iter().position(|i| i.titulo == resposta1.trim()) {
+        lista2.remove(i);
+    }
+}
 fn adicionar_tarefa(lista: &mut Vec<Tarefa>) {
     let mut tarefa = Tarefa {
         titulo: String::new(),
@@ -79,7 +96,8 @@ fn main() {
         match variavel_input.trim() {
             "1" => adicionar_tarefa(&mut listaTarefas),
             "2" => listar_tarefas(&mut listaTarefas),
-            "3" => adicionar_feito(&mut listaTarefas),
+            "3" => retirar_tarefa(&mut listaTarefas),
+
             _ => println!("outro valor"),
         }
     }
