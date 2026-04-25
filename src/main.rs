@@ -1,30 +1,60 @@
+use rusqlite::Connection;
 use std::io;
-fn listar_tarefas(lista: &mut Vec<Tarefa>) {
-    let mut lista2 = lista;
 
-    for (i) in lista2 {
-        println!("{}, {} {}", i.titulo, i.descricao, i.feito)
+fn listar_tarefas(conn: &Connection) {
+    let mut stmt = conn
+        .prepare("SELECT id, titulo, descricao, feito FROM tarefas")
+        .expect("erro em pegar tarefas no banco");
+
+    let tarefas = stmt
+        .query_map([], |row| {
+            Ok(Tarefa {
+                id: Some(row.get(0)?),
+                titulo: row.get(1)?,
+                descricao: row.get(2)?,
+                feito: row.get::<_, i32>(3)? != 0,
+            })
+        })
+        .expect("erro ao listar tarefas no banco");
+
+    for tarefa in tarefas {
+        let t = tarefa.expect("erro");
+
+        println!("\n LISTA DE TAREFAS\n");
+
+        println!("ID: {}", t.id.unwrap());
+        println!("Título: {}", t.titulo);
+        println!("Descrição: {}", t.descricao);
+        println!(
+            "Status: {}",
+            if t.feito { " Concluída" } else { " Pendente" }
+        );
+        println!("------------------------------");
     }
 }
-fn retirar_tarefa(lista: &mut Vec<Tarefa>) {
-    let mut lista2 = lista;
+fn retirar_tarefa(conn: &Connection) {
+    let mut input = String::new();
 
-    let mut contador = 0;
+    println!("Digite o ID da tarefa que deseja remover:");
 
-    for (i) in lista2.iter() {
-        contador = contador + 1;
-        println!("{}, {} {}", i.titulo, i.descricao, i.feito)
-    }
-    println!("Digite o titulo que você deseja retirar:");
-    let mut resposta1 = String::new();
-    io::stdin().read_line(&mut resposta1).unwrap();
+    io::stdin().read_line(&mut input).unwrap();
 
-    if let Some(i) = lista2.iter().position(|i| i.titulo == resposta1.trim()) {
-        lista2.remove(i);
-    }
+    let id: i32 = match input.trim().parse() {
+        Ok(num) => num,
+        Err(_) => {
+            println!("ID inválido!");
+            return println!("auau");
+        }
+    };
+
+    conn.execute("DELETE FROM tarefas WHERE id = ?1", [id])
+        .expect("erro");
+
+    println!("Tarefa removida com sucesso!");
 }
-fn adicionar_tarefa(lista: &mut Vec<Tarefa>) {
+fn adicionar_tarefa(conn: &Connection) {
     let mut tarefa = Tarefa {
+        id: None,
         titulo: String::new(),
         descricao: String::new(),
         feito: false,
@@ -41,62 +71,86 @@ fn adicionar_tarefa(lista: &mut Vec<Tarefa>) {
     tarefa.titulo = resposta1.trim().to_string();
     tarefa.descricao = resposta2.trim().to_string();
 
+    println!("\n ADICIONAR NOVA TAREFA");
+
+    println!("Digite o título:");
+    println!("Digite a descrição:");
+
     println!(
-        "Adicionado: {} - {} - {}",
-        tarefa.titulo, tarefa.descricao, tarefa.feito
+        "\n Tarefa adicionada:\n {}\n {}\nPendente",
+        tarefa.titulo, tarefa.descricao
     );
 
-    lista.push(tarefa);
+    conn.execute(
+        "INSERT INTO tarefas (titulo, descricao, feito) VALUES (?1, ?2, ?3)",
+        (&tarefa.titulo, &tarefa.descricao, tarefa.feito),
+    )
+    .expect("Erro ao inserir no banco");
 }
 struct Tarefa {
+    id: Option<i32>,
     titulo: String,
     descricao: String,
     feito: bool,
 }
-fn adicionar_feito(lista: &mut Vec<Tarefa>) {
-    println!("Qual tarefa quer marcar o feito?");
+fn marcar_como_concluida(conn: &Connection) {
+    let mut input = String::new();
 
-    for (i, tarefa) in lista.iter().enumerate() {
-        println!("{}: {}, feito: {}", i, tarefa.titulo, tarefa.feito);
-    }
+    println!("Digite o ID da tarefa que deseja marcar como concluída:");
 
-    let mut valor = String::new();
-    io::stdin()
-        .read_line(&mut valor)
-        .expect("Falha ao ler linha");
+    io::stdin().read_line(&mut input).unwrap();
 
-    let indice_escolhido: usize = match valor.trim().parse() {
+    let id: i32 = match input.trim().parse() {
         Ok(num) => num,
         Err(_) => {
-            println!("Por favor, digite um número válido!");
-            return;
+            println!("ID inválido!");
+            return println!("auau");
         }
     };
 
-    if let Some(tarefa) = lista.get_mut(indice_escolhido) {
-        tarefa.feito = true;
-        println!("Tarefa '{}' marcada como concluída!", tarefa.titulo);
+    let linhas = conn
+        .execute("UPDATE tarefas SET feito = ?1 WHERE id = ?2", (true, id))
+        .expect("erro");
+
+    if linhas == 0 {
+        println!("Nenhuma tarefa encontrada com esse ID.");
     } else {
-        println!("Índice {} não encontrado na lista.", indice_escolhido);
+        println!("Tarefa marcada como concluída!");
     }
 }
+
 fn main() {
+    let conn = Connection::open("banco.db").expect("erro ao encontrar o banco");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS tarefas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo TEXT NOT NULL,
+    descricao TEXT NOT NULL,
+    feito BOOLEAN NOT NULL
+)",
+        [],
+    );
+
     let mut listaTarefas: Vec<Tarefa> = Vec::new();
 
     loop {
-        println!("Qual opção?");
-        println!("adicionar");
-        println!("listar");
-        println!("retirar");
+        println!("\n=== GERENCIADOR DE TAREFAS ===");
+        println!("1 → Adicionar tarefa");
+        println!("2 → Listar tarefas");
+        println!("3 → Remover tarefa");
+        println!("4 → Marcar como concluída");
+        println!("Escolha uma opção:");
 
         let mut variavel_input = String::new();
 
         io::stdin().read_line(&mut variavel_input).unwrap();
 
         match variavel_input.trim() {
-            "1" => adicionar_tarefa(&mut listaTarefas),
-            "2" => listar_tarefas(&mut listaTarefas),
-            "3" => retirar_tarefa(&mut listaTarefas),
+            "1" => adicionar_tarefa(&conn),
+            "2" => listar_tarefas(&conn),
+            "3" => retirar_tarefa(&conn),
+            "4" => marcar_como_concluida(&conn),
 
             _ => println!("outro valor"),
         }
