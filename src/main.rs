@@ -87,6 +87,30 @@ fn adicionar_tarefa(conn: &Connection) {
     )
     .expect("Erro ao inserir no banco");
 }
+fn excluir_todas(conn: &Connection) {
+    let mut stmt = conn
+        .prepare("SELECT id, titulo, descricao, feito FROM tarefas")
+        .expect("Erro ao preparar consulta");
+
+    let tarefas = stmt
+        .query_map([], |row| {
+            Ok(Tarefa {
+                id: Some(row.get(0)?),
+                titulo: row.get(1)?,
+                descricao: row.get(2)?,
+                feito: row.get::<_, i32>(3)? != 0,
+            })
+        })
+        .expect("Erro ao mapear tarefas");
+
+    for tarefa_result in tarefas {
+        if let Ok(tarefa) = tarefa_result {
+            conn.execute("DELETE FROM tarefas WHERE id = ?1", [tarefa.id])
+                .expect("Erro ao deletar tarefa");
+        }
+    }
+}
+
 struct Tarefa {
     id: Option<i32>,
     titulo: String,
@@ -140,6 +164,7 @@ fn main() {
         println!("2 → Listar tarefas");
         println!("3 → Remover tarefa");
         println!("4 → Marcar como concluída");
+        println!("5 → Apagar todas");
         println!("Escolha uma opção:");
 
         let mut variavel_input = String::new();
@@ -151,6 +176,7 @@ fn main() {
             "2" => listar_tarefas(&conn),
             "3" => retirar_tarefa(&conn),
             "4" => marcar_como_concluida(&conn),
+            "5" => excluir_todas(&conn),
 
             _ => println!("outro valor"),
         }
